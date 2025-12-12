@@ -1,10 +1,9 @@
 'use client';
 
-
 import { useState, useEffect } from "react";
 import { completeOnboarding } from "@/actions/onboarding";
-import { motion } from "framer-motion";
-import { Store, Truck, ArrowRight, Loader2, User, MapPin } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Store, Truck, ArrowRight, Loader2, User, MapPin, Clock, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function OnboardingPage() {
@@ -12,6 +11,15 @@ export default function OnboardingPage() {
   const [loading, setLoading] = useState(false);
   const [location, setLocation] = useState<{lat: number, lng: number} | null>(null);
   const [gettingLocation, setGettingLocation] = useState(false);
+  const [selectedHolidays, setSelectedHolidays] = useState<string[]>([]);
+
+  const daysOfWeek = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+  const toggleHoliday = (day: string) => {
+    setSelectedHolidays(prev => 
+      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]
+    );
+  };
 
   const handleGetLocation = () => {
     setGettingLocation(true);
@@ -53,7 +61,7 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-      <div className="max-w-3xl w-full">
+      <div className="max-w-3xl w-full my-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -131,14 +139,27 @@ export default function OnboardingPage() {
               </h3>
               
               {role !== 'customer' && (
-                <div className="space-y-2">
-                  <label className="text-sm text-slate-400">Business Name</label>
-                  <input
-                    name="businessName"
-                    required={role !== 'customer'}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors"
-                    placeholder="e.g. Sharma General Store"
-                  />
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm text-slate-400">Business Name</label>
+                    <input
+                      name="businessName"
+                      required={role !== 'customer'}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors"
+                      placeholder="e.g. Sharma General Store"
+                    />
+                  </div>
+
+                  {role === 'vendor' && (
+                    <div className="space-y-2">
+                       <label className="text-sm text-slate-400">GSTIN (Optional)</label>
+                       <input
+                         name="gstin"
+                         className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors uppercase"
+                         placeholder="22AAAAA0000A1Z5"
+                       />
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -189,6 +210,69 @@ export default function OnboardingPage() {
                   </div>
                 )}
               </div>
+
+              {/* Advanced Vendor Fields */}
+              {role === 'vendor' && (
+                <div className="pt-4 border-t border-slate-800 space-y-6">
+                  <h4 className="text-md font-medium text-slate-300 flex items-center gap-2">
+                    <Clock className="w-4 h-4" /> Store Timings & Operations
+                  </h4>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm text-slate-400">Opens At</label>
+                      <input
+                        type="time"
+                        name="opensAt"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm text-slate-400">Closes At</label>
+                      <input
+                        type="time"
+                        name="closesAt"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm text-slate-400">Min. Order for Acceptance (₹)</label>
+                    <input
+                      type="number"
+                      name="minOrderAcc"
+                      defaultValue={0}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors"
+                      placeholder="0"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm text-slate-400 flex items-center gap-2">
+                      <Calendar className="w-4 h-4" /> Weekly Holidays
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {daysOfWeek.map(day => (
+                        <button
+                          key={day}
+                          type="button"
+                          onClick={() => toggleHoliday(day)}
+                          className={cn(
+                            "px-4 py-2 rounded-lg text-sm font-medium transition-all",
+                            selectedHolidays.includes(day)
+                              ? "bg-red-500/20 text-red-400 border border-red-500/50"
+                              : "bg-slate-950 border border-slate-800 text-slate-400 hover:border-slate-700"
+                          )}
+                        >
+                          {day}
+                        </button>
+                      ))}
+                    </div>
+                    <input type="hidden" name="holidays" value={JSON.stringify(selectedHolidays)} />
+                  </div>
+                </div>
+              )}
 
               <button
                 type="submit"

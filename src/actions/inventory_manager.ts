@@ -30,6 +30,18 @@ export async function uploadProductImage(formData: FormData) {
   return uploadResult.secure_url;
 }
 
+async function getInventoryCollection(db: FirebaseFirestore.Firestore, uid: string) {
+  const userDoc = await db.collection("users").doc(uid).get();
+  const role = userDoc.data()?.role;
+
+  if (role === 'dealer') {
+    return db.collection("users").doc(uid).collection("inventory");
+  } else {
+    // Default to global inventory for vendors or others
+    return db.collection("inventory");
+  }
+}
+
 export async function addInventoryItem(data: any) {
   const session = await getSession();
   if (!session) throw new Error("Unauthorized");
@@ -62,27 +74,39 @@ export async function addInventoryItem(data: any) {
     }
   }
 
+  const collectionRef = await getInventoryCollection(db, session.uid);
   const normalizedId = data.name.toLowerCase().trim().replace(/[^a-z0-9]/g, '_');
-  const itemRef = db.collection("inventory").doc(`${session.uid}_${normalizedId}`);
+  
+  // For dealers (subcollection), doc ID can be simpler or same. 
+  // For global inventory, we used ${session.uid}_${normalizedId} to avoid collisions.
+  // We can keep the same ID strategy for consistency.
+  const docId = `${session.uid}_${normalizedId}`; 
+  const itemRef = collectionRef.doc(docId);
 
   await itemRef.set({
-    vendor_id: session.uid,
+    vendor_id: session.uid, // Owner ID
     id: normalizedId,
     name: data.name,
+    sku: data.sku || "",
+    brand: data.brand || "",
     category: category,
     emoji: emoji,
     quantity: Number(data.quantity) || 0,
-    sellingPrice: Number(data.price) || 0, // Customer facing price
-    average_price: Number(data.price) || 0, // Cost price (simplified for manual add)
-    total_value: (Number(data.quantity) || 0) * (Number(data.price) || 0),
+    unit: data.unit || "pcs",
+    sellingPrice: Number(data.sellingPrice) || Number(data.price) || 0,
+    average_price: Number(data.costPrice) || Number(data.price) || 0,
+    total_value: (Number(data.quantity) || 0) * (Number(data.costPrice) || Number(data.price) || 0),
+    minStock: Number(data.minStock) || 0,
+    expiryDate: data.expiryDate || null,
     image: data.image || null,
     description: data.description || "",
+    tags: data.tags ? data.tags.split(',').map((t: string) => t.trim()) : [],
     last_updated: new Date().getTime(),
     sources: [{
       type: 'manual',
       date: new Date().toISOString().split('T')[0],
       quantity: data.quantity,
-      price: data.price
+      price: data.costPrice || data.price
     }]
   });
 
@@ -100,11 +124,12 @@ export async function updateInventoryItem(itemId: string, data: any) {
 
   if (!itemId) throw new Error("Invalid item ID");
 
-  const itemRef = db.collection("inventory").doc(itemId);
+  const collectionRef = await getInventoryCollection(db, session.uid);
+  const itemRef = collectionRef.doc(itemId);
   const doc = await itemRef.get();
   
-  if (!doc.exists || doc.data()?.vendor_id !== session.uid) {
-    throw new Error("Item not found or unauthorized");
+  if (!doc.exists) {
+    throw new Error("Item not found");
   }
 
   await itemRef.update({
@@ -130,13 +155,9 @@ export async function deleteInventoryItem(itemId: string) {
 
   if (!itemId) throw new Error("Invalid item ID");
 
-  const itemRef = db.collection("inventory").doc(itemId);
-  const doc = await itemRef.get();
+  const collectionRef = await getInventoryCollection(db, session.uid);
+  const itemRef = collectionRef.doc(itemId);
   
-  if (!doc.exists || doc.data()?.vendor_id !== session.uid) {
-    throw new Error("Item not found or unauthorized");
-  }
-
   await itemRef.delete();
 
   revalidatePath("/dashboard");

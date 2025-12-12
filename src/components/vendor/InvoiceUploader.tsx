@@ -29,7 +29,7 @@ export default function InvoiceUploader() {
 
   return (
     <div className="space-y-6">
-      <div className="border-2 border-dashed border-slate-800 rounded-xl p-8 text-center hover:border-blue-500/50 transition-colors bg-slate-900/20">
+      <div className="border-2 border-dashed border-gray-300 dark:border-slate-800 rounded-xl p-8 text-center hover:border-blue-500/50 transition-colors bg-gray-50 dark:bg-slate-900/20">
         <input
           type="file"
           id="invoice-upload"
@@ -50,8 +50,8 @@ export default function InvoiceUploader() {
             )}
           </div>
           <div>
-            <h3 className="text-lg font-medium text-white">Upload Invoice</h3>
-            <p className="text-slate-400 text-sm mt-1">
+            <h3 className="text-lg font-medium text-slate-900 dark:text-white">Upload Invoice</h3>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
               Take a photo or upload an image to auto-extract items
             </p>
           </div>
@@ -62,7 +62,7 @@ export default function InvoiceUploader() {
         <motion.div 
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-slate-900/50 border border-slate-800 rounded-xl p-6"
+          className="bg-white dark:bg-slate-900/50 border border-gray-200 dark:border-slate-800 rounded-xl p-6"
         >
           <div className="flex items-center gap-2 mb-4 text-green-500">
             <CheckCircle className="w-5 h-5" />
@@ -71,21 +71,21 @@ export default function InvoiceUploader() {
           
           <div className="space-y-4">
             <div className="flex justify-between text-sm">
-              <span className="text-slate-400">Date</span>
-              <span className="text-white">{result.date}</span>
+              <span className="text-slate-500 dark:text-slate-400">Date</span>
+              <span className="text-slate-900 dark:text-white">{result.date}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-slate-400">Total Amount</span>
-              <span className="text-white font-bold">₹{result.total_amount}</span>
+              <span className="text-slate-500 dark:text-slate-400">Total Amount</span>
+              <span className="text-slate-900 dark:text-white font-bold">₹{result.total_amount}</span>
             </div>
             
-            <div className="border-t border-slate-800 pt-4 mt-4">
-              <h4 className="text-sm font-medium text-slate-300 mb-3">Extracted Items</h4>
+            <div className="border-t border-gray-200 dark:border-slate-800 pt-4 mt-4">
+              <h4 className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-3">Extracted Items</h4>
               <div className="space-y-2">
                 {result.items?.map((item: any, i: number) => (
                   <div key={i} className="flex justify-between text-sm">
-                    <span className="text-slate-400">{item.name} x{item.quantity}</span>
-                    <span className="text-white">₹{item.total_price}</span>
+                    <span className="text-slate-500 dark:text-slate-400">{item.name} x{item.quantity}</span>
+                    <span className="text-slate-900 dark:text-white">₹{item.total_price}</span>
                   </div>
                 ))}
               </div>

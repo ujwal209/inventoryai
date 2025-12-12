@@ -44,6 +44,20 @@ export async function completeOnboarding(formData: FormData) {
     throw new Error("Firebase Admin not initialized");
   }
 
+  /* Extract Extra Details */
+  const gstin = formData.get("gstin") as string;
+  const minOrderAcc = formData.get("minOrderAcc") as string;
+  const opensAt = formData.get("opensAt") as string;
+  const closesAt = formData.get("closesAt") as string;
+  const holidaysStr = formData.get("holidays") as string;
+  
+  let holidays: string[] = [];
+  try {
+    holidays = holidaysStr ? JSON.parse(holidaysStr) : [];
+  } catch (e) {
+    console.error("Failed to parse holidays", e);
+  }
+
   const db = getFirestore(adminApp);
 
   try {
@@ -63,6 +77,11 @@ export async function completeOnboarding(formData: FormData) {
         name: businessName,
         address,
         phone,
+        gstin,
+        minOrderAcc,
+        opensAt,
+        closesAt,
+        holidays
       };
     }
 

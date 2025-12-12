@@ -44,12 +44,23 @@ export async function getVendorInventory() {
   const db = getFirestore(admin);
 
   try {
-    const snapshot = await db.collection("inventory")
-      .where("vendor_id", "==", session.uid)
-      .get();
+    // Determine user role to pick correct collection
+    const userDoc = await db.collection("users").doc(session.uid).get();
+    const role = userDoc.data()?.role;
+
+    let snapshot;
+    if (role === 'dealer') {
+       // Dealers: Dedicated sub-collection
+       snapshot = await db.collection("users").doc(session.uid).collection("inventory").get();
+    } else {
+       // Vendors: Global inventory filtered by ID
+       snapshot = await db.collection("inventory")
+         .where("vendor_id", "==", session.uid)
+         .get();
+    }
 
     return snapshot.docs.map(doc => ({
-      docId: doc.id, // Actual Firestore Doc ID for updates/deletes
+      docId: doc.id,
       ...doc.data()
     }));
   } catch (error) {
@@ -60,7 +71,18 @@ export async function getVendorInventory() {
 
 export async function updateVendorLocation(
   location: { lat: number; lng: number },
-  details?: { name: string; phone: string; address: string; bannerUrl: string; logoUrl: string }
+  details?: { 
+    name: string; 
+    phone: string; 
+    address: string; 
+    bannerUrl: string; 
+    logoUrl: string;
+    gstin?: string;
+    minOrderAcc?: string;
+    opensAt?: string;
+    closesAt?: string;
+    holidays?: string[];
+  }
 ) {
   const session = await getSession();
   if (!session) throw new Error("Unauthorized");
@@ -79,6 +101,11 @@ export async function updateVendorLocation(
     updateData["business_details.address"] = details.address || "";
     if (details.bannerUrl !== undefined) updateData["business_details.bannerUrl"] = details.bannerUrl;
     if (details.logoUrl !== undefined) updateData["business_details.logoUrl"] = details.logoUrl;
+    if (details.gstin !== undefined) updateData["business_details.gstin"] = details.gstin;
+    if (details.minOrderAcc !== undefined) updateData["business_details.minOrderAcc"] = details.minOrderAcc;
+    if (details.opensAt !== undefined) updateData["business_details.opensAt"] = details.opensAt;
+    if (details.closesAt !== undefined) updateData["business_details.closesAt"] = details.closesAt;
+    if (details.holidays !== undefined) updateData["business_details.holidays"] = details.holidays;
   }
 
   // Remove any undefined keys just in case
@@ -118,5 +145,42 @@ export async function getVendorStats() {
   } catch (error) {
     console.error("Error fetching stats:", error);
     return null;
+  }
+}
+
+export async function getDealersForVendor() {
+  const session = await getSession();
+  if (!session) return [];
+
+  const admin = await initAdmin();
+  if (!admin) return [];
+  const db = getFirestore(admin);
+
+  try {
+    // In a real app, we might query 'connections' or 'orders' to find connected dealers.
+    // For this prototype, we'll fetch ALL approved dealers to populate the "Network" tab so the vendor can see potential customers.
+    const snapshot = await db.collection("users")
+      .where("role", "==", "dealer")
+      .where("status", "==", "approved")
+      .get();
+
+    return snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        name: data.business_details?.name || data.name || "Unknown Dealer",
+        location: data.business_details?.address || "Location not set",
+        email: data.email,
+        image: data.business_details?.logoUrl || data.business_details?.bannerUrl || null,
+        // Mocking financial fields for the "Customers" view since current user schema doesn't have credit limits per vendor yet
+        tier: "Standard",
+        creditUsed: Math.floor(Math.random() * 50000),
+        creditLimit: 100000,
+        lastOrder: "Never"
+      };
+    });
+  } catch (error) {
+    console.error("Error fetching dealers:", error);
+    return [];
   }
 }

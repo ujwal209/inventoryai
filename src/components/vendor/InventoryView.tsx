@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Search, Filter, Package, ChevronDown, ChevronUp, History, Tag, AlertCircle, Sparkles, Plus, Trash2, Edit2, X, Save, Upload, Loader2, Image as ImageIcon, CheckCircle, AlertTriangle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { getItemInsight } from "@/actions/insights";
+
 import { addInventoryItem, updateInventoryItem, deleteInventoryItem, uploadProductImage } from "@/actions/inventory_manager";
 
 interface InventoryViewProps {
@@ -21,12 +21,14 @@ const Toast = ({ message, type, onClose }: { message: string, type: 'success' | 
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 20, scale: 0.9 }}
       className={`fixed bottom-6 right-6 z-50 px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 border ${
-        type === 'success' ? 'bg-slate-900 border-green-500/50 text-green-400' : 'bg-slate-900 border-red-500/50 text-red-400'
+        type === 'success' 
+          ? 'bg-white dark:bg-slate-900 border-green-500/50 text-green-600 dark:text-green-400' 
+          : 'bg-white dark:bg-slate-900 border-red-500/50 text-red-600 dark:text-red-400'
       }`}
     >
       {type === 'success' ? <CheckCircle className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
-      <span className="font-medium text-white">{message}</span>
-      <button onClick={onClose} className="ml-2 p-1 hover:bg-white/10 rounded-full transition-colors">
+      <span className="font-medium text-slate-900 dark:text-white">{message}</span>
+      <button onClick={onClose} className="ml-2 p-1 hover:bg-slate-100 dark:hover:bg-white/10 rounded-full transition-colors">
         <X className="w-4 h-4" />
       </button>
     </motion.div>
@@ -37,8 +39,7 @@ export default function InventoryView({ inventory }: InventoryViewProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [insights, setInsights] = useState<Record<string, string>>({});
-  const [loadingInsight, setLoadingInsight] = useState<string | null>(null);
+
   
   // Toast State
   const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
@@ -63,24 +64,9 @@ export default function InventoryView({ inventory }: InventoryViewProps) {
     setToast({ message, type });
   };
 
-  const handleExpand = async (item: any) => {
-    if (isEditMode) return; // Disable expand when editing
-    const isExpanding = expandedId !== item.docId;
-    setExpandedId(isExpanding ? item.docId : null);
-
-    if (isExpanding) {
-      if (!insights[item.docId]) {
-        setLoadingInsight(item.docId);
-        try {
-          const insight = await getItemInsight(item);
-          setInsights(prev => ({ ...prev, [item.docId]: insight }));
-        } catch (e) {
-          console.error(e);
-        } finally {
-          setLoadingInsight(null);
-        }
-      }
-    }
+  const handleExpand = (item: any) => {
+    if (isEditMode) return; 
+    setExpandedId(expandedId === item.docId ? null : item.docId);
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, isEdit: boolean = false) => {
@@ -177,7 +163,7 @@ export default function InventoryView({ inventory }: InventoryViewProps) {
             placeholder="Search inventory..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
+            className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl pl-10 pr-4 py-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors shadow-sm dark:shadow-none"
           />
         </div>
         
@@ -188,8 +174,8 @@ export default function InventoryView({ inventory }: InventoryViewProps) {
               onClick={() => setSelectedCategory(cat)}
               className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
                 selectedCategory === cat 
-                  ? 'bg-blue-600 text-white' 
-                  : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'
+                  ? 'bg-blue-600 text-white shadow-md' 
+                  : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white border border-gray-200 dark:border-slate-700'
               }`}
             >
               {cat}
@@ -197,7 +183,7 @@ export default function InventoryView({ inventory }: InventoryViewProps) {
           ))}
           <button 
             onClick={() => setIsAddModalOpen(true)}
-            className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg text-sm font-medium flex items-center gap-2 whitespace-nowrap"
+            className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg text-sm font-medium flex items-center gap-2 whitespace-nowrap shadow-md focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
           >
             <Plus className="w-4 h-4" /> Add Item
           </button>
@@ -212,11 +198,11 @@ export default function InventoryView({ inventory }: InventoryViewProps) {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto"
+              className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl"
             >
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold text-white">Add New Product</h3>
-                <button onClick={() => setIsAddModalOpen(false)} className="text-slate-400 hover:text-white">
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white">Add New Product</h3>
+                <button onClick={() => setIsAddModalOpen(false)} className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -224,7 +210,7 @@ export default function InventoryView({ inventory }: InventoryViewProps) {
               <div className="space-y-4">
                 {/* Image Upload */}
                 <div>
-                  <label className="block text-sm text-slate-400 mb-2">Product Image (Compulsory)</label>
+                  <label className="block text-sm text-slate-500 dark:text-slate-400 mb-2">Product Image (Compulsory)</label>
                   <div className="relative group">
                     <input
                       type="file"
@@ -233,11 +219,11 @@ export default function InventoryView({ inventory }: InventoryViewProps) {
                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                       disabled={uploadingImage}
                     />
-                    <div className={`border-2 border-dashed border-slate-700 rounded-xl p-6 text-center transition-colors ${newItem.image ? 'bg-slate-800' : 'hover:border-blue-500/50 hover:bg-slate-800/50'}`}>
+                    <div className={`border-2 border-dashed border-gray-300 dark:border-slate-700 rounded-xl p-6 text-center transition-colors ${newItem.image ? 'bg-gray-50 dark:bg-slate-800' : 'hover:border-blue-500/50 hover:bg-gray-50 dark:hover:bg-slate-800/50'}`}>
                       {uploadingImage ? (
                         <div className="flex flex-col items-center gap-2">
                           <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
-                          <span className="text-sm text-slate-400">Uploading...</span>
+                          <span className="text-sm text-slate-500 dark:text-slate-400">Uploading...</span>
                         </div>
                       ) : newItem.image ? (
                         <div className="relative h-40 w-full">
@@ -248,8 +234,8 @@ export default function InventoryView({ inventory }: InventoryViewProps) {
                         </div>
                       ) : (
                         <div className="flex flex-col items-center gap-2">
-                          <Upload className="w-8 h-8 text-slate-500" />
-                          <span className="text-sm text-slate-400">Click to upload image</span>
+                          <Upload className="w-8 h-8 text-slate-400 dark:text-slate-500" />
+                          <span className="text-sm text-slate-500 dark:text-slate-400">Click to upload image</span>
                         </div>
                       )}
                     </div>
@@ -257,54 +243,54 @@ export default function InventoryView({ inventory }: InventoryViewProps) {
                 </div>
 
                 <div>
-                  <label className="block text-sm text-slate-400 mb-1">Item Name</label>
+                  <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">Item Name</label>
                   <input 
                     type="text" 
                     value={newItem.name}
                     onChange={(e) => setNewItem({...newItem, name: e.target.value})}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-white focus:border-blue-500 outline-none"
+                    className="w-full bg-gray-50 dark:bg-slate-950 border border-gray-300 dark:border-slate-800 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:border-blue-500 outline-none"
                     placeholder="e.g., Maggi Noodles"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm text-slate-400 mb-1">Quantity</label>
+                    <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">Quantity</label>
                     <input 
                       type="number" 
                       value={newItem.quantity}
                       onChange={(e) => setNewItem({...newItem, quantity: e.target.value})}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-white focus:border-blue-500 outline-none"
+                      className="w-full bg-gray-50 dark:bg-slate-950 border border-gray-300 dark:border-slate-800 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:border-blue-500 outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm text-slate-400 mb-1">Selling Price (₹)</label>
+                    <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">Selling Price (₹)</label>
                     <input 
                       type="number" 
                       value={newItem.price}
                       onChange={(e) => setNewItem({...newItem, price: e.target.value})}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-white focus:border-blue-500 outline-none"
+                      className="w-full bg-gray-50 dark:bg-slate-950 border border-gray-300 dark:border-slate-800 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:border-blue-500 outline-none"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm text-slate-400 mb-1">Description</label>
+                  <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">Description</label>
                   <textarea 
                     value={newItem.description}
                     onChange={(e) => setNewItem({...newItem, description: e.target.value})}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-white focus:border-blue-500 outline-none min-h-[80px]"
+                    className="w-full bg-gray-50 dark:bg-slate-950 border border-gray-300 dark:border-slate-800 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:border-blue-500 outline-none min-h-[80px]"
                     placeholder="Describe the product..."
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm text-slate-400 mb-1">Category (Optional)</label>
+                  <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">Category (Optional)</label>
                   <input 
                     type="text" 
                     value={newItem.category}
                     onChange={(e) => setNewItem({...newItem, category: e.target.value})}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-white focus:border-blue-500 outline-none"
+                    className="w-full bg-gray-50 dark:bg-slate-950 border border-gray-300 dark:border-slate-800 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:border-blue-500 outline-none"
                     placeholder="e.g., Snacks"
                   />
                 </div>
@@ -312,7 +298,7 @@ export default function InventoryView({ inventory }: InventoryViewProps) {
                 <button 
                   onClick={handleAddItem}
                   disabled={uploadingImage || !newItem.name || !newItem.quantity || !newItem.price}
-                  className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-500 text-white font-medium py-3 rounded-xl mt-4 transition-colors"
+                  className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-gray-300 disabled:dark:bg-slate-800 disabled:text-gray-500 disabled:dark:text-slate-500 text-white font-medium py-3 rounded-xl mt-4 transition-colors"
                 >
                   Add to Inventory
                 </button>
@@ -329,8 +315,8 @@ export default function InventoryView({ inventory }: InventoryViewProps) {
             key={item.docId}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className={`bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden transition-all duration-200 ${
-              expandedId === item.docId ? 'ring-1 ring-blue-500/50 shadow-lg shadow-blue-900/10' : 'hover:border-slate-700'
+            className={`bg-white dark:bg-slate-900/50 border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden transition-all duration-200 shadow-sm dark:shadow-none ${
+              expandedId === item.docId ? 'ring-1 ring-blue-500/50 shadow-lg shadow-blue-900/10' : 'hover:border-gray-300 dark:hover:border-slate-700'
             }`}
           >
             <div className="p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -339,7 +325,7 @@ export default function InventoryView({ inventory }: InventoryViewProps) {
                 className="flex items-center gap-4 flex-1 cursor-pointer w-full"
                 onClick={() => handleExpand(item)}
               >
-                <div className="w-16 h-16 bg-slate-800 rounded-xl overflow-hidden flex-shrink-0 border border-slate-700 relative group">
+                <div className="w-16 h-16 bg-gray-100 dark:bg-slate-800 rounded-xl overflow-hidden flex-shrink-0 border border-gray-200 dark:border-slate-700 relative group">
                    {isEditMode === item.docId ? (
                      <>
                         <input
@@ -382,20 +368,20 @@ export default function InventoryView({ inventory }: InventoryViewProps) {
                       value={editItem.name}
                       onChange={(e) => setEditItem({...editItem, name: e.target.value})}
                       onBlur={() => handleUpdate(item.docId, true)}
-                      className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-white w-full mb-2"
+                      className="bg-gray-50 dark:bg-slate-950 border border-gray-300 dark:border-slate-700 rounded px-2 py-1 text-slate-900 dark:text-white w-full mb-2"
                       onClick={(e) => e.stopPropagation()}
                     />
                   ) : (
-                    <h3 className="font-semibold text-lg text-white">{item.name}</h3>
+                    <h3 className="font-semibold text-lg text-slate-900 dark:text-white">{item.name}</h3>
                   )}
                   
-                  <div className="flex items-center gap-3 text-sm text-slate-400 mt-1">
-                    <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-800/50 border border-slate-700/50">
+                  <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400 mt-1">
+                    <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-gray-100 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700/50">
                       <Tag className="w-3 h-3" />
                       {item.category}
                     </span>
                     {item.quantity < 10 && (
-                      <span className="flex items-center gap-1 text-red-400 font-medium">
+                      <span className="flex items-center gap-1 text-red-500 dark:text-red-400 font-medium">
                         <AlertCircle className="w-3 h-3" />
                         Low Stock
                       </span>
@@ -407,34 +393,34 @@ export default function InventoryView({ inventory }: InventoryViewProps) {
               {/* Actions & Stats */}
               <div className="flex items-center gap-6 w-full sm:w-auto justify-between sm:justify-end">
                 <div className="text-right">
-                  <p className="text-sm text-slate-400 mb-0.5">Price</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-0.5">Price</p>
                   {isEditMode === item.docId ? (
                     <input 
                       type="number" 
                       value={editItem.price}
                       onChange={(e) => setEditItem({...editItem, price: Number(e.target.value)})}
                       onBlur={() => handleUpdate(item.docId, true)}
-                      className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-white w-20 text-right"
+                      className="bg-gray-50 dark:bg-slate-950 border border-gray-300 dark:border-slate-700 rounded px-2 py-1 text-slate-900 dark:text-white w-20 text-right"
                       onClick={(e) => e.stopPropagation()}
                     />
                   ) : (
-                    <p className="text-xl font-bold text-white">₹{item.sellingPrice || item.average_price || 0}</p>
+                    <p className="text-xl font-bold text-slate-900 dark:text-white">₹{item.sellingPrice || item.average_price || 0}</p>
                   )}
                 </div>
                 
                 <div className="text-right">
-                  <p className="text-sm text-slate-400 mb-0.5">Qty</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-0.5">Qty</p>
                   {isEditMode === item.docId ? (
                     <input 
                       type="number" 
                       value={editItem.quantity}
                       onChange={(e) => setEditItem({...editItem, quantity: Number(e.target.value)})}
                       onBlur={() => handleUpdate(item.docId, true)}
-                      className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-white w-20 text-right"
+                      className="bg-gray-50 dark:bg-slate-950 border border-gray-300 dark:border-slate-700 rounded px-2 py-1 text-slate-900 dark:text-white w-20 text-right"
                       onClick={(e) => e.stopPropagation()}
                     />
                   ) : (
-                    <p className="text-xl font-bold text-white">{item.quantity}</p>
+                    <p className="text-xl font-bold text-slate-900 dark:text-white">{item.quantity}</p>
                   )}
                 </div>
 
@@ -443,7 +429,7 @@ export default function InventoryView({ inventory }: InventoryViewProps) {
                     <>
                       <button 
                         onClick={() => handleUpdate(item.docId)}
-                        className="p-2 bg-blue-600/20 text-blue-500 rounded-lg hover:bg-blue-600/30"
+                        className="p-2 bg-blue-100 dark:bg-blue-600/20 text-blue-600 dark:text-blue-500 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-600/30"
                         title="Finish Editing"
                       >
                         <CheckCircle className="w-4 h-4" />
@@ -453,21 +439,21 @@ export default function InventoryView({ inventory }: InventoryViewProps) {
                     <>
                       <button 
                         onClick={() => { setIsEditMode(item.docId); setEditItem({...item, price: item.sellingPrice || item.average_price}); }}
-                        className="p-2 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
+                        className="p-2 text-slate-500 dark:text-slate-400 hover:text-blue-500 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors"
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button 
                         onClick={() => handleDelete(item.docId)}
-                        className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                        className="p-2 text-slate-500 dark:text-slate-400 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </>
                   )}
                   <div 
-                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-transform duration-200 bg-slate-800 cursor-pointer ${
-                      expandedId === item.docId ? 'rotate-180 text-blue-400' : 'text-slate-400'
+                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-transform duration-200 bg-gray-100 dark:bg-slate-800 cursor-pointer ${
+                      expandedId === item.docId ? 'rotate-180 text-blue-500 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400'
                     }`}
                     onClick={() => handleExpand(item)}
                   >
@@ -483,34 +469,17 @@ export default function InventoryView({ inventory }: InventoryViewProps) {
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: "auto", opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
-                  className="border-t border-slate-800 bg-slate-950/30"
+                  className="border-t border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/30"
                 >
                   <div className="p-5">
                     {item.description && (
-                      <div className="mb-4 p-4 bg-slate-900 rounded-lg border border-slate-800">
-                        <h5 className="text-sm font-medium text-slate-400 mb-1">Description</h5>
-                        <p className="text-white text-sm">{item.description}</p>
+                      <div className="mb-4 p-4 bg-white dark:bg-slate-900 rounded-lg border border-gray-200 dark:border-slate-800">
+                        <h5 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Description</h5>
+                        <p className="text-slate-900 dark:text-white text-sm">{item.description}</p>
                       </div>
                     )}
                     
-                    <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg flex gap-3 relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-4 opacity-5">
-                          <Sparkles className="w-24 h-24" />
-                        </div>
-                        <div className="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center shrink-0">
-                          <Sparkles className="w-4 h-4 text-blue-400" />
-                        </div>
-                        <div className="flex-1 relative z-10">
-                          <h5 className="text-sm font-medium text-blue-400">AI Insight</h5>
-                          <p className="text-sm text-slate-300 mt-1 min-h-[20px]">
-                            {loadingInsight === item.docId ? (
-                              <span className="animate-pulse">Analyzing stock patterns...</span>
-                            ) : (
-                              insights[item.docId] || "Click to generate insights."
-                            )}
-                          </p>
-                        </div>
-                      </div>
+
                   </div>
                 </motion.div>
               )}

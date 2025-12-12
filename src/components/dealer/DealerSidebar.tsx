@@ -2,15 +2,13 @@
 
 import { 
   LayoutDashboard, 
-  FileText, 
-  Package, 
-  TrendingUp, 
+  Store, 
+  MessageSquare, 
   Settings, 
   LogOut,
   ScanLine,
-  MessageSquare,
-  ShoppingBag,
-  Users
+  Search,
+  FileText
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
@@ -20,27 +18,26 @@ interface SidebarProps {
   setActiveTab: (tab: string) => void;
 }
 
-export default function VendorSidebar({ activeTab, setActiveTab }: SidebarProps) {
+export default function DealerSidebar({ activeTab, setActiveTab }: SidebarProps) {
   const { signOut } = useAuth();
+  
   const menuItems = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-    { id: 'orders', label: 'Orders', icon: ShoppingBag },
-    { id: 'invoices', label: 'Invoices', icon: FileText },
-    { id: 'inventory', label: 'Inventory', icon: Package },
-    { id: 'network', label: 'Network', icon: Users },
+    { id: 'inventory', label: 'Inventory', icon: Store },
+    { id: 'orders', label: 'Sent Orders', icon: FileText },
+    { id: 'invoice', label: 'Raise Invoice', icon: Store },
     { id: 'chat', label: 'Messages', icon: MessageSquare },
-    { id: 'analytics', label: 'Analytics', icon: TrendingUp },
-    { id: 'settings', label: 'Settings', icon: Settings },
+    { id: 'settings', label: 'Profile Settings', icon: Settings },
   ];
 
   return (
     <div className="w-64 bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 h-screen flex flex-col transition-colors duration-300">
       <div className="p-6 border-b border-gray-200 dark:border-slate-800">
-        <div className="flex items-center gap-2 text-blue-600 dark:text-blue-500">
+        <div className="flex items-center gap-2 text-purple-600 dark:text-purple-500">
           <ScanLine className="w-8 h-8" />
           <span className="font-bold text-xl text-slate-900 dark:text-white">InventoryAI</span>
         </div>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Vendor Portal</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Dealer Portal</p>
       </div>
 
       <nav className="flex-1 p-4 space-y-2">
@@ -51,7 +48,7 @@ export default function VendorSidebar({ activeTab, setActiveTab }: SidebarProps)
             className={cn(
               "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200",
               activeTab === item.id 
-                ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" 
+                ? "bg-purple-600 text-white shadow-lg shadow-purple-500/20" 
                 : "text-slate-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white"
             )}
           >
@@ -70,12 +67,11 @@ export default function VendorSidebar({ activeTab, setActiveTab }: SidebarProps)
           <span className="font-medium">Sign Out</span>
         </button>
 
-        <div className="bg-gray-100 dark:bg-slate-800/50 rounded-xl p-4 mb-4">
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">Storage Used</p>
-          <div className="w-full h-1.5 bg-gray-200 dark:bg-slate-700 rounded-full overflow-hidden">
-            <div className="w-[75%] h-full bg-blue-500 rounded-full" />
-          </div>
-          <p className="text-xs text-right text-slate-500 dark:text-slate-400 mt-1">75%</p>
+        <div className="bg-gray-100 dark:bg-slate-800/50 rounded-xl p-4">
+           <p className="text-xs text-slate-500 dark:text-slate-400">Account Status</p>
+           <p className="text-sm font-bold text-green-500 mt-1 flex items-center gap-1">
+             ● Active
+           </p>
         </div>
       </div>
     </div>

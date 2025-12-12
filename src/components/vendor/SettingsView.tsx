@@ -2,9 +2,10 @@
 
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
-import { Save, Loader2, MapPin, Store, Image as ImageIcon, Upload } from 'lucide-react';
+import { Save, Loader2, MapPin, Store, Image as ImageIcon, Upload, Clock, Calendar } from 'lucide-react';
 import { updateVendorLocation } from '@/actions/vendor';
 import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 // Dynamically import the Map component to avoid SSR issues with Leaflet
 const VendorMap = dynamic(
@@ -12,7 +13,7 @@ const VendorMap = dynamic(
   { 
     ssr: false,
     loading: () => (
-      <div className="h-full w-full flex items-center justify-center bg-slate-900/50 text-slate-400">
+      <div className="h-full w-full flex items-center justify-center bg-gray-100 dark:bg-slate-900/50 text-slate-400">
         <Loader2 className="w-8 h-8 animate-spin" />
         <span className="ml-2">Loading Map...</span>
       </div>
@@ -22,13 +23,31 @@ const VendorMap = dynamic(
 
 export default function SettingsView({ user }: { user: any }) {
   const [location, setLocation] = useState(user.location || { lat: 20.5937, lng: 78.9629 });
+  
+  // Basic Details
   const [businessName, setBusinessName] = useState(user.business_details?.name || "");
   const [phone, setPhone] = useState(user.business_details?.phone || "");
   const [address, setAddress] = useState(user.business_details?.address || "");
   const [bannerUrl, setBannerUrl] = useState(user.business_details?.bannerUrl || "");
   const [logoUrl, setLogoUrl] = useState(user.business_details?.logoUrl || "");
+
+  // Advanced Details
+  const [gstin, setGstin] = useState(user.business_details?.gstin || "");
+  const [minOrderAcc, setMinOrderAcc] = useState(user.business_details?.minOrderAcc || "");
+  const [opensAt, setOpensAt] = useState(user.business_details?.opensAt || "");
+  const [closesAt, setClosesAt] = useState(user.business_details?.closesAt || "");
+  const [holidays, setHolidays] = useState<string[]>(user.business_details?.holidays || []);
+
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const daysOfWeek = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+  const toggleHoliday = (day: string) => {
+    setHolidays(prev => 
+      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]
+    );
+  };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'banner' | 'logo') => {
     const file = e.target.files?.[0];
@@ -71,7 +90,12 @@ export default function SettingsView({ user }: { user: any }) {
         phone,
         address,
         bannerUrl,
-        logoUrl
+        logoUrl,
+        gstin,
+        minOrderAcc,
+        opensAt,
+        closesAt,
+        holidays
       });
       // Success feedback could be a toast, for now we just stop loading
     } catch (error) {
@@ -91,8 +115,8 @@ export default function SettingsView({ user }: { user: any }) {
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white">Store Settings</h1>
-          <p className="text-slate-400 mt-1">Manage your business profile, branding, and location.</p>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Store Settings</h1>
+          <p className="text-slate-500 dark:text-slate-400 mt-1">Manage your business profile, branding, and location.</p>
         </div>
         <button
           onClick={handleSave}
@@ -111,16 +135,16 @@ export default function SettingsView({ user }: { user: any }) {
           {/* Branding Card */}
           <motion.div 
             whileHover={{ y: -2 }}
-            className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 overflow-hidden relative group"
+            className="bg-white dark:bg-slate-900/50 backdrop-blur-xl border border-gray-200 dark:border-slate-800 rounded-2xl p-6 overflow-hidden relative group shadow-sm dark:shadow-none"
           >
             <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
             
-            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2 relative z-10">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2 relative z-10">
               <ImageIcon className="w-5 h-5 text-purple-500" /> Branding
             </h2>
 
             {/* Banner Upload */}
-            <div className="relative w-full h-48 rounded-xl bg-slate-800 border-2 border-dashed border-slate-700 overflow-hidden group/banner transition-colors hover:border-slate-600">
+            <div className="relative w-full h-48 rounded-xl bg-gray-100 dark:bg-slate-800 border-2 border-dashed border-gray-300 dark:border-slate-700 overflow-hidden group/banner transition-colors hover:border-slate-400 dark:hover:border-slate-600">
               {bannerUrl ? (
                 <img src={bannerUrl} alt="Banner" className="w-full h-full object-cover" />
               ) : (
@@ -130,7 +154,7 @@ export default function SettingsView({ user }: { user: any }) {
                 </div>
               )}
               
-              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/banner:opacity-100 flex items-center justify-center transition-opacity backdrop-blur-sm">
+              <div className="absolute inset-0 bg-black/60 opacity-0 group/banner:opacity-100 flex items-center justify-center transition-opacity backdrop-blur-sm">
                 <label className="cursor-pointer px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-full font-medium backdrop-blur-md border border-white/20 transition-all transform hover:scale-105 flex items-center gap-2">
                   <Upload className="w-4 h-4" />
                   {bannerUrl ? "Change Banner" : "Upload Banner"}
@@ -142,14 +166,14 @@ export default function SettingsView({ user }: { user: any }) {
             {/* Logo Upload */}
             <div className="absolute top-24 left-6">
               <div className="relative group/logo">
-                <div className="w-24 h-24 rounded-2xl bg-slate-900 border-4 border-slate-900 shadow-xl overflow-hidden flex items-center justify-center relative z-20">
+                <div className="w-24 h-24 rounded-2xl bg-white dark:bg-slate-900 border-4 border-white dark:border-slate-900 shadow-xl overflow-hidden flex items-center justify-center relative z-20">
                   {logoUrl ? (
                     <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
                   ) : (
-                    <Store className="w-10 h-10 text-slate-600" />
+                    <Store className="w-10 h-10 text-slate-400 dark:text-slate-600" />
                   )}
                 </div>
-                <label className="absolute inset-0 z-30 flex items-center justify-center bg-black/60 opacity-0 group-hover/logo:opacity-100 rounded-2xl cursor-pointer transition-opacity backdrop-blur-sm border-4 border-transparent">
+                <label className="absolute inset-0 z-30 flex items-center justify-center bg-black/60 opacity-0 group/logo:opacity-100 rounded-2xl cursor-pointer transition-opacity backdrop-blur-sm border-4 border-transparent">
                   <Upload className="w-6 h-6 text-white" />
                   <input type="file" className="hidden" accept="image/*" onChange={(e) => handleImageUpload(e, 'logo')} />
                 </label>
@@ -164,43 +188,114 @@ export default function SettingsView({ user }: { user: any }) {
           {/* Business Details Card */}
           <motion.div 
             whileHover={{ y: -2 }}
-            className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 relative group"
+            className="bg-white dark:bg-slate-900/50 backdrop-blur-xl border border-gray-200 dark:border-slate-800 rounded-2xl p-6 relative group shadow-sm dark:shadow-none"
           >
             <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
             
-            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2 relative z-10">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2 relative z-10">
               <Store className="w-5 h-5 text-blue-500" /> Business Details
             </h2>
             
             <div className="grid md:grid-cols-2 gap-6 relative z-10">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-400">Business Name</label>
+                <label className="text-sm font-medium text-slate-500 dark:text-slate-400">Business Name</label>
                 <input
                   value={businessName}
                   onChange={(e) => setBusinessName(e.target.value)}
-                  className="w-full bg-slate-950/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder:text-slate-600"
+                  className="w-full bg-gray-50 dark:bg-slate-950/50 border border-gray-300 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
                   placeholder="e.g. My Awesome Store"
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-400">Phone Number</label>
+                <label className="text-sm font-medium text-slate-500 dark:text-slate-400">Phone Number</label>
                 <input
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="w-full bg-slate-950/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder:text-slate-600"
+                  className="w-full bg-gray-50 dark:bg-slate-950/50 border border-gray-300 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
                   placeholder="+91 98765 43210"
                 />
               </div>
 
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-500 dark:text-slate-400">GSTIN</label>
+                <input
+                  value={gstin}
+                  onChange={(e) => setGstin(e.target.value)}
+                  className="w-full bg-gray-50 dark:bg-slate-950/50 border border-gray-300 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600 uppercase"
+                  placeholder="22AAAAA0000A1Z5"
+                />
+              </div>
+              
+               <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-500 dark:text-slate-400">Min. Order Accept (₹)</label>
+                <input
+                  type="number"
+                  value={minOrderAcc}
+                  onChange={(e) => setMinOrderAcc(e.target.value)}
+                  className="w-full bg-gray-50 dark:bg-slate-950/50 border border-gray-300 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
+                  placeholder="0"
+                />
+              </div>
+
               <div className="md:col-span-2 space-y-2">
-                <label className="text-sm font-medium text-slate-400">Address</label>
+                <label className="text-sm font-medium text-slate-500 dark:text-slate-400">Address</label>
                 <textarea
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  className="w-full bg-slate-950/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all min-h-[100px] resize-none placeholder:text-slate-600"
+                  className="w-full bg-gray-50 dark:bg-slate-950/50 border border-gray-300 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all min-h-[100px] resize-none placeholder:text-slate-400 dark:placeholder:text-slate-600"
                   placeholder="Full address of your store..."
                 />
+              </div>
+
+              {/* Timings */}
+              <div className="md:col-span-2 pt-4 border-t border-gray-200 dark:border-slate-800 space-y-4">
+                 <h3 className="text-md font-medium text-slate-900 dark:text-white flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-blue-500" /> Operational Details
+                 </h3>
+                 
+                 <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-slate-500 dark:text-slate-400">Opens At</label>
+                      <input
+                        type="time"
+                        value={opensAt}
+                        onChange={(e) => setOpensAt(e.target.value)}
+                        className="w-full bg-gray-50 dark:bg-slate-950/50 border border-gray-300 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-slate-500 dark:text-slate-400">Closes At</label>
+                      <input
+                        type="time"
+                        value={closesAt}
+                        onChange={(e) => setClosesAt(e.target.value)}
+                        className="w-full bg-gray-50 dark:bg-slate-950/50 border border-gray-300 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                      <Calendar className="w-4 h-4" /> Weekly Holidays
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {daysOfWeek.map(day => (
+                        <button
+                          key={day}
+                          onClick={() => toggleHoliday(day)}
+                          className={cn(
+                            "px-4 py-2 rounded-lg text-sm font-medium transition-all",
+                            holidays.includes(day)
+                              ? "bg-red-500/10 text-red-500 border border-red-500/30"
+                              : "bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:border-gray-300 dark:hover:border-slate-700"
+                          )}
+                        >
+                          {day}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
               </div>
             </div>
           </motion.div>
@@ -210,18 +305,18 @@ export default function SettingsView({ user }: { user: any }) {
         <div className="lg:col-span-1">
           <motion.div 
             whileHover={{ y: -2 }}
-            className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 h-full flex flex-col relative group"
+            className="bg-white dark:bg-slate-900/50 backdrop-blur-xl border border-gray-200 dark:border-slate-800 rounded-2xl p-6 h-full flex flex-col relative group shadow-sm dark:shadow-none"
           >
             <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
             
-            <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2 relative z-10">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2 relative z-10">
               <MapPin className="w-5 h-5 text-green-500" /> Location
             </h2>
-            <p className="text-slate-400 text-sm mb-6 relative z-10">
+            <p className="text-slate-500 dark:text-slate-400 text-sm mb-6 relative z-10">
               Pin your store on the map so customers can find you easily.
             </p>
 
-            <div className="flex-1 min-h-[400px] w-full rounded-xl overflow-hidden border border-slate-700 relative z-10 shadow-2xl">
+            <div className="flex-1 min-h-[400px] w-full rounded-xl overflow-hidden border border-gray-300 dark:border-slate-700 relative z-10 shadow-lg">
               <VendorMap 
                 location={location} 
                 setLocation={setLocation} 

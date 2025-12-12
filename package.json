@@ -27,6 +27,7 @@
     "react": "19.2.1",
     "react-dom": "19.2.1",
     "react-leaflet": "^5.0.0",
+    "sonner": "^2.0.7",
     "stream-chat": "^9.27.0",
     "stream-chat-react": "^13.13.0",
     "tailwind-merge": "^3.4.0",
