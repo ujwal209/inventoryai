@@ -121,52 +121,94 @@ export async function updateRequestStatus(requestId: string, status: 'accepted' 
         const vendorId = session.uid;
         const items = requestData.items || [];
 
-        // 1. Process Stock Transfer
+        // PHASE 1: Reads (Robust Lookup)
+        const readResults = [];
         for (const item of items) {
-          // A. Decrement Vendor Stock
-          const vendorInventoryRef = db.collection("users").doc(vendorId).collection("inventory");
-          const vendorSnapshot = await t.get(vendorInventoryRef.where("name", "==", item.name).limit(1));
+          // A. Read Dealer Item (Try ID first, then Name)
+          let dealerItemDoc = null;
+          if (item.docId) {
+             const docRef = db.collection("users").doc(dealerId).collection("inventory").doc(item.docId);
+             const docSnap = await t.get(docRef);
+             if (docSnap.exists) dealerItemDoc = docSnap;
+          }
           
-          if (!vendorSnapshot.empty) {
-            const vendorItemDoc = vendorSnapshot.docs[0];
-            const currentQty = vendorItemDoc.data().quantity || 0;
-            const newQty = Math.max(0, currentQty - item.qty); 
-            t.update(vendorItemDoc.ref, { quantity: newQty });
+          if (!dealerItemDoc) {
+             const dealerInventoryRef = db.collection("users").doc(dealerId).collection("inventory");
+             const snapshot = await t.get(dealerInventoryRef.where("name", "==", item.name).limit(1));
+             if (!snapshot.empty) dealerItemDoc = snapshot.docs[0];
           }
 
-          // B. Increment Dealer Stock
-          const dealerInventoryRef = db.collection("users").doc(dealerId).collection("inventory");
-          const dealerSnapshot = await t.get(dealerInventoryRef.where("name", "==", item.name).limit(1));
+          // B. Read Vendor Item
+          const globalInventoryRef = db.collection("inventory");
+          const vendorSnapshot = await t.get(globalInventoryRef
+             .where("vendor_id", "==", vendorId)
+             .where("name", "==", item.name)
+             .limit(1)
+          );
 
-          const sourceEntry = {
-            type: 'request',
-            from: vendorName, 
-            quantity: item.qty,
-            date: new Date().toISOString().split('T')[0],
-            requestId: requestId
+          readResults.push({ item, dealerItemDoc, vendorSnapshot });
+        }
+
+        // PHASE 2: Writes
+        for (const result of readResults) {
+          const { item, dealerItemDoc, vendorSnapshot } = result;
+          
+          let itemDetails = {
+             price: 0,
+             image: null,
+             description: "",
+             unit: "pcs",
+             category: "Returns"
           };
 
-          if (!dealerSnapshot.empty) {
-            const dealerItemDoc = dealerSnapshot.docs[0];
-            const currentQty = dealerItemDoc.data().quantity || 0;
-            t.update(dealerItemDoc.ref, { 
-                quantity: currentQty + item.qty,
-                sources: FieldValue.arrayUnion(sourceEntry)
-            });
+          // A. Dealer Write & Data Capture
+          if (dealerItemDoc && dealerItemDoc.exists) {
+             const data = dealerItemDoc.data();
+             const currentQty = data.quantity || 0;
+             t.update(dealerItemDoc.ref, { quantity: currentQty - item.qty });
+             
+             // Capture details for Vendor
+             itemDetails = {
+                price: data.price || 0,
+                image: data.image || null,
+                description: data.description || "",
+                unit: data.unit || "pcs",
+                category: data.category || "Returns"
+             };
+          }
+
+          // B. Vendor Write
+          if (!vendorSnapshot.empty) {
+            const vendorItemDoc = vendorSnapshot.docs[0];
+            const vendorCurrentQty = vendorItemDoc.data().quantity || 0;
+            // Update quantity. We avoid overwriting price/details on existing items to preserve Vendor customization.
+            t.update(vendorItemDoc.ref, { quantity: vendorCurrentQty + item.qty });
           } else {
-            // Create New Item for Dealer
-            const newItemRef = dealerInventoryRef.doc();
+            // Create New Item with Rich Data from Dealer
+            const normalizedId = item.name.toLowerCase().trim().replace(/[^a-z0-9]/g, '_');
+            const newItemRef = db.collection("inventory").doc(`${vendorId}_${normalizedId}`);
+            
             t.set(newItemRef, {
+              vendor_id: vendorId,
+              id: normalizedId,
               name: item.name,
               quantity: item.qty,
-              category: "Uncategorized", 
-              price: 0, 
-              unit: "pcs",
+              ...itemDetails, // Spread captured dealer details (Image, Price, etc.)
               updatedAt: new Date().getTime(),
-              sources: [sourceEntry]
+              last_updated: new Date().getTime()
             });
           }
         }
+        
+        // 3. Create Notification for Dealer
+        const notificationRef = db.collection("users").doc(dealerId).collection("notifications").doc();
+        t.set(notificationRef, {
+           title: "Stock Request Accepted",
+           message: `${vendorName} accepted your requests. Inventory has been transferred.`,
+           type: "success",
+           read: false,
+           createdAt: new Date().getTime() 
+        });
       }
 
       // 2. Update Request Status
