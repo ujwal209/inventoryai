@@ -221,6 +221,7 @@ export default function StoreView({ vendor, onBack, user }: StoreViewProps) {
       {/* Chat Window */}
       {showChat && (
         <ChatWindow 
+          key={vendor.uid}
           user={user} 
           vendorId={vendor.uid} 
           vendorName={vendor.business_details?.name} 

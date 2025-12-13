@@ -12,13 +12,18 @@ import {
   Thread, 
   LoadingIndicator, 
   ChannelList,
-  useChatContext
+  useChatContext,
+  useChannelStateContext
 } from 'stream-chat-react';
 import 'stream-chat-react/dist/css/v2/index.css';
 import { Plus, X, MessageSquare, Users, ArrowLeft, Send } from 'lucide-react';
+import { toast } from 'sonner';
+
 import { getStreamToken } from '@/actions/chat';
 
-const API_KEY = process.env.NEXT_PUBLIC_STREAM_KEY || '';
+const API_KEY = process.env.NEXT_PUBLIC_STREAM_KEY || 'your_stream_api_key';
+const SOUND_URL = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
+
 
 interface DealerChatProps {
   user: any;
@@ -27,6 +32,22 @@ interface DealerChatProps {
 
 export default function DealerChat({ user, vendors = [] }: DealerChatProps) {
   const [client, setClient] = useState<StreamChat | null>(null);
+  const [theme, setTheme] = useState('messaging light');
+
+  useEffect(() => {
+    // Theme detection
+    const updateTheme = () => {
+      const isDark = document.documentElement.classList.contains('dark');
+      setTheme(isDark ? 'str-chat__theme-dark' : 'str-chat__theme-light');
+    };
+
+    updateTheme(); // Initial check
+
+    const observer = new MutationObserver(updateTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const initChat = async () => {
@@ -39,8 +60,8 @@ export default function DealerChat({ user, vendors = [] }: DealerChatProps) {
         await chatClient.connectUser(
           { 
             id: user.uid, 
-            name: user.name || user.email,
-            image: user.image 
+            name: user.business_details?.name || user.name || user.email,
+            image: user.business_details?.logoUrl || user.image 
           },
           token
         );
@@ -58,6 +79,24 @@ export default function DealerChat({ user, vendors = [] }: DealerChatProps) {
     };
   }, [user.uid]);
 
+  useEffect(() => {
+    if (!client) return;
+
+    const handleNewMessage = (event: any) => {
+      if (event.type === 'message.new' && event.user?.id !== client.userID) {
+        const audio = new Audio(SOUND_URL);
+        audio.play().catch(e => console.log('Audio play failed', e));
+      }
+    };
+
+    client.on('message.new', handleNewMessage);
+
+    return () => {
+      client.off('message.new', handleNewMessage);
+    };
+  }, [client]);
+
+
   if (!client) {
     return (
       <div className="h-[600px] flex flex-col items-center justify-center text-slate-500">
@@ -69,41 +108,79 @@ export default function DealerChat({ user, vendors = [] }: DealerChatProps) {
 
   return (
     <div className="h-[calc(100vh-140px)] bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm relative isolate">
-       <Chat client={client} theme="messaging light">
+       <Chat client={client} theme={theme}>
          <ChatInterface user={user} vendors={vendors} />
        </Chat>
     </div>
+
   );
 }
+
+// Custom Header for Dealer View
+const CustomChatHeader = ({ user, vendors, setMobileView }: any) => {
+  const { channel } = useChannelStateContext();
+  
+  const otherMember = Object.values(channel.state.members).find((m: any) => m.user.id !== user.uid);
+  const vendorInfo = vendors.find((v: any) => v.uid === otherMember?.user?.id || v.id === otherMember?.user?.id);
+  
+  const displayTitle = vendorInfo?.business_details?.name || vendorInfo?.name || otherMember?.user?.name || channel.data?.name || "Unknown";
+  const displayImage = vendorInfo?.business_details?.logoUrl || vendorInfo?.image || otherMember?.user?.image || channel.data?.image;
+
+  return (
+     <div className="h-16 flex items-center px-4 border-b border-gray-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md justify-between">
+        <div className="flex items-center gap-3">
+           <button 
+             onClick={() => setMobileView('list')}
+             className="md:hidden p-2 -ml-2 text-slate-500 hover:text-slate-900 dark:hover:text-white rounded-full hover:bg-gray-100 dark:hover:bg-slate-800"
+           >
+             <ArrowLeft className="w-5 h-5" />
+           </button>
+           
+           <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 p-0.5">
+                 <div className="w-full h-full rounded-full bg-white dark:bg-slate-900 overflow-hidden">
+                    {displayImage ? (
+                       <img src={displayImage} className="w-full h-full object-cover" />
+                    ) : (
+                       <div className="w-full h-full flex items-center justify-center font-bold text-slate-500">{displayTitle?.charAt(0)}</div>
+                    )}
+                 </div>
+              </div>
+
+               <div>
+                 <h3 className="font-bold text-slate-900 dark:text-white text-sm">
+                   {displayTitle}
+                 </h3>
+                 <p className="text-xs text-green-500 font-medium flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Online
+                 </p>
+              </div>
+           </div>
+        </div>
+     </div>
+  );
+};
 
 function ChatInterface({ user, vendors }: { user: any, vendors: any[] }) {
   const { setActiveChannel, channel: activeChannel } = useChatContext();
   const [mobileView, setMobileView] = useState<'list' | 'chat'>('list');
   const [showContacts, setShowContacts] = useState(false);
 
+  const { client } = useChatContext();
+
   const filters = { type: 'messaging', members: { $in: [user.uid] } };
   const sort = { last_message_at: -1 };
 
-  const startChat = async (vendor: any) => {
-    const { client } = user; // useChatContext gives client? Yes, it's available via context usually, but wait.
-    // actually useChatContext returns { client }
-    
-    // We can get client from context
-  };
-
-  // Re-implement startChat with context client
-  const { client } = useChatContext();
   
   const handleStartChat = async (vendor: any) => {
     if (!client) return;
 
     const channel = client.channel('messaging', {
       members: [user.uid, vendor.id],
-      name: vendor.name,
-      image: vendor.image
     } as any);
 
     await channel.watch();
+
     setActiveChannel(channel);
     setShowContacts(false);
     setMobileView('chat');
@@ -111,7 +188,16 @@ function ChatInterface({ user, vendors }: { user: any, vendors: any[] }) {
 
   const CustomChannelPreview = (props: any) => {
     const { channel, setActiveChannel } = props;
+    const { channel: activeChannel } = useChatContext();
+
     const isSelected = channel.id === activeChannel?.id;
+    const otherMember = Object.values(channel.state.members).find((m: any) => m.user.id !== user.uid);
+    const vendorInfo = vendors.find((v: any) => v.uid === otherMember?.user?.id || v.id === otherMember?.user?.id);
+
+    // Dynamic Title based on Vendor List (Source of Truth)
+    const displayTitle = vendorInfo?.business_details?.name || vendorInfo?.name || otherMember?.user?.name || channel.data?.name || 'Unknown';
+    const displayImage = vendorInfo?.business_details?.logoUrl || vendorInfo?.image || otherMember?.user?.image || channel.data?.image;
+
     const unreadCount = channel.countUnread();
     const lastMessage = channel.state.messages[channel.state.messages.length - 1];
   
@@ -127,10 +213,10 @@ function ChatInterface({ user, vendors }: { user: any, vendors: any[] }) {
       >
         <div className="relative">
           <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold shrink-0 shadow-sm">
-            {channel.data?.image ? (
-                <img src={channel.data.image} className="w-full h-full rounded-full object-cover" />
+            {displayImage ? (
+                <img src={displayImage} className="w-full h-full rounded-full object-cover" />
             ) : (
-                channel.data?.name?.charAt(0) || 'U'
+                displayTitle.charAt(0) || 'U'
             )}
           </div>
           {channel.state.watcher_count > 0 && <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white dark:border-slate-900 rounded-full"></span>}
@@ -139,7 +225,7 @@ function ChatInterface({ user, vendors }: { user: any, vendors: any[] }) {
         <div className="flex-1 overflow-hidden">
           <div className="flex justify-between items-center mb-0.5">
             <span className={`font-semibold truncate ${isSelected ? 'text-purple-700 dark:text-white' : 'text-slate-900 dark:text-slate-200'}`}>
-              {channel.data?.name || 'Unknown'}
+              {displayTitle}
             </span>
             <span className="text-[10px] text-slate-400">
                {lastMessage?.created_at ? new Date(lastMessage.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}
@@ -240,33 +326,11 @@ function ChatInterface({ user, vendors }: { user: any, vendors: any[] }) {
           {activeChannel ? (
              <Channel>
                <Window>
-                 <div className="h-16 flex items-center px-4 border-b border-gray-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md justify-between">
-                    <div className="flex items-center gap-3">
-                       <button 
-                         onClick={() => setMobileView('list')}
-                         className="md:hidden p-2 -ml-2 text-slate-500 hover:text-slate-900 dark:hover:text-white rounded-full hover:bg-gray-100 dark:hover:bg-slate-800"
-                       >
-                         <ArrowLeft className="w-5 h-5" />
-                       </button>
-                       <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 p-0.5">
-                             <div className="w-full h-full rounded-full bg-white dark:bg-slate-900 overflow-hidden">
-                                {activeChannel.data?.image ? (
-                                   <img src={activeChannel.data.image} className="w-full h-full object-cover" />
-                                ) : (
-                                   <div className="w-full h-full flex items-center justify-center font-bold text-slate-500">{activeChannel.data?.name?.charAt(0)}</div>
-                                )}
-                             </div>
-                          </div>
-                          <div>
-                            <h3 className="font-bold text-slate-900 dark:text-white text-sm">{activeChannel.data?.name}</h3>
-                            <p className="text-xs text-green-500 font-medium flex items-center gap-1">
-                               <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Online
-                            </p>
-                          </div>
-                       </div>
-                    </div>
-                 </div>
+                 <CustomChatHeader 
+                    user={user} 
+                    vendors={vendors} 
+                    setMobileView={setMobileView}
+                 />
                  
                  <div className="flex-1 bg-gray-50/50 dark:bg-slate-950/50 relative">
                    <div className="absolute inset-0 overflow-hidden">
@@ -275,7 +339,7 @@ function ChatInterface({ user, vendors }: { user: any, vendors: any[] }) {
                  </div>
                  
                  <div className="p-4 bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-slate-800">
-                    <MessageInput />
+                    <MessageInput focus />
                  </div>
                </Window>
                <Thread />

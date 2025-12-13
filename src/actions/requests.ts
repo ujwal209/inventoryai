@@ -25,12 +25,24 @@ export async function createStockRequest(vendorId: string, items: any[]) {
     items: items.map(i => ({
       name: i.name,
       qty: i.orderQty,
-      docId: i.docId || null
+      docId: i.docId || null,
+      price: i.sellingPrice || i.price || 0,
+      image: i.image || null,
+      unit: i.unit || 'pcs'
     })),
     total_items: items.reduce((acc, i) => acc + i.orderQty, 0),
     status: 'pending',
     created_at: new Date().getTime(),
     updated_at: new Date().getTime()
+  });
+
+  // Notify Vendor
+  await db.collection("users").doc(vendorId).collection("notifications").add({
+    title: "New Stock Request",
+    message: `${dealerName} sent a request for ${items.reduce((acc, i) => acc + i.orderQty, 0)} items.`,
+    type: "info",
+    read: false,
+    createdAt: new Date().getTime()
   });
 
   revalidatePath("/dashboard");
@@ -163,17 +175,17 @@ export async function updateRequestStatus(requestId: string, status: 'accepted' 
 
           // A. Dealer Write & Data Capture
           if (dealerItemDoc && dealerItemDoc.exists) {
-             const data = dealerItemDoc.data();
-             const currentQty = data.quantity || 0;
+             const dealerData = dealerItemDoc.data() || {};
+             const currentQty = dealerData.quantity || 0;
              t.update(dealerItemDoc.ref, { quantity: currentQty - item.qty });
              
              // Capture details for Vendor
              itemDetails = {
-                price: data.price || 0,
-                image: data.image || null,
-                description: data.description || "",
-                unit: data.unit || "pcs",
-                category: data.category || "Returns"
+                price: item.price || dealerData.price || 0,
+                image: item.image || dealerData.image || null,
+                description: item.description || dealerData.description || "",
+                unit: item.unit || dealerData.unit || "pcs",
+                category: item.category || dealerData.category || "Returns"
              };
           }
 

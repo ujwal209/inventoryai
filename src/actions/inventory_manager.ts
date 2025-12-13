@@ -47,7 +47,6 @@ export async function addInventoryItem(data: any) {
   if (!session) throw new Error("Unauthorized");
 
   const admin = await initAdmin();
-  if (!admin) throw new Error("Database error");
   const db = getFirestore(admin);
 
   // AI Category & Emoji Prediction if not provided
@@ -76,15 +75,11 @@ export async function addInventoryItem(data: any) {
 
   const collectionRef = await getInventoryCollection(db, session.uid);
   const normalizedId = data.name.toLowerCase().trim().replace(/[^a-z0-9]/g, '_');
-  
-  // For dealers (subcollection), doc ID can be simpler or same. 
-  // For global inventory, we used ${session.uid}_${normalizedId} to avoid collisions.
-  // We can keep the same ID strategy for consistency.
   const docId = `${session.uid}_${normalizedId}`; 
   const itemRef = collectionRef.doc(docId);
 
-  await itemRef.set({
-    vendor_id: session.uid, // Owner ID
+  const newItem = {
+    vendor_id: session.uid,
     id: normalizedId,
     name: data.name,
     sku: data.sku || "",
@@ -100,7 +95,7 @@ export async function addInventoryItem(data: any) {
     expiryDate: data.expiryDate || null,
     image: data.image || null,
     description: data.description || "",
-    tags: data.tags ? data.tags.split(',').map((t: string) => t.trim()) : [],
+    tags: Array.isArray(data.tags) ? data.tags : (data.tags ? String(data.tags).split(',').map(t => t.trim()) : []),
     last_updated: new Date().getTime(),
     sources: [{
       type: 'manual',
@@ -108,10 +103,12 @@ export async function addInventoryItem(data: any) {
       quantity: data.quantity,
       price: data.costPrice || data.price
     }]
-  });
+  };
+
+  await itemRef.set(newItem);
 
   revalidatePath("/dashboard");
-  return { success: true };
+  return { success: true, item: { ...newItem, docId: docId } };
 }
 
 export async function updateInventoryItem(itemId: string, data: any) {
@@ -119,7 +116,6 @@ export async function updateInventoryItem(itemId: string, data: any) {
   if (!session) throw new Error("Unauthorized");
 
   const admin = await initAdmin();
-  if (!admin) throw new Error("Database error");
   const db = getFirestore(admin);
 
   if (!itemId) throw new Error("Invalid item ID");
@@ -132,17 +128,36 @@ export async function updateInventoryItem(itemId: string, data: any) {
     throw new Error("Item not found");
   }
 
-  await itemRef.update({
-    name: data.name || doc.data()?.name || "",
-    quantity: Number(data.quantity) || 0,
-    sellingPrice: Number(data.price) || doc.data()?.sellingPrice || 0,
-    image: data.image || doc.data()?.image || null,
-    description: data.description || doc.data()?.description || "",
+  const existingData = doc.data() || {};
+
+  const updatedFields = {
+    name: data.name ?? existingData.name ?? "",
+    sku: data.sku ?? existingData.sku ?? "",
+    brand: data.brand ?? existingData.brand ?? "",
+    category: data.category ?? existingData.category ?? "Uncategorized",
+    quantity: data.quantity !== undefined ? Number(data.quantity) : (existingData.quantity || 0),
+    sellingPrice: data.sellingPrice !== undefined ? Number(data.sellingPrice) : (data.price !== undefined ? Number(data.price) : (existingData.sellingPrice || 0)),
+    image: data.image ?? existingData.image ?? null,
+    description: data.description ?? existingData.description ?? "",
+    unit: data.unit ?? existingData.unit ?? "pcs",
+    minStock: data.minStock !== undefined ? Number(data.minStock) : (existingData.minStock || 0),
+    expiryDate: data.expiryDate || existingData.expiryDate || null,
+    tags: Array.isArray(data.tags) ? data.tags : (data.tags ? String(data.tags).split(',').map((t: string) => t.trim()) : existingData.tags || []),
     last_updated: new Date().getTime()
+  };
+
+  // Ensure no undefined values are passed to Firestore
+  Object.keys(updatedFields).forEach(key => {
+    if ((updatedFields as any)[key] === undefined) {
+      (updatedFields as any)[key] = null;
+    }
   });
 
+  await itemRef.update(updatedFields);
+
   revalidatePath("/dashboard");
-  return { success: true };
+  // Merge updated fields with existing data to return full object
+  return { success: true, item: { ...existingData, ...updatedFields, docId: itemId } };
 }
 
 export async function deleteInventoryItem(itemId: string) {
@@ -150,7 +165,6 @@ export async function deleteInventoryItem(itemId: string) {
   if (!session) throw new Error("Unauthorized");
 
   const admin = await initAdmin();
-  if (!admin) throw new Error("Database error");
   const db = getFirestore(admin);
 
   if (!itemId) throw new Error("Invalid item ID");
@@ -161,5 +175,89 @@ export async function deleteInventoryItem(itemId: string) {
   await itemRef.delete();
 
   revalidatePath("/dashboard");
-  return { success: true };
+  return { success: true, docId: itemId };
+}
+
+export async function scanProductImage(formData: FormData) {
+  const session = await getSession();
+  if (!session) throw new Error("Unauthorized");
+
+  const file = formData.get("file") as File;
+  if (!file) throw new Error("No file uploaded");
+
+  const arrayBuffer = await file.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+  
+  const imageUrl = await new Promise<string>((resolve, reject) => {
+    cloudinary.uploader.upload_stream(
+      { folder: "scanned_products" },
+      (error, result) => {
+        if (error) reject(error);
+        else resolve(result?.secure_url || "");
+      }
+    ).end(buffer);
+  });
+
+  try {
+     const imagePart = {
+       inlineData: {
+         data: buffer.toString("base64"),
+         mimeType: file.type
+       }
+     };
+
+     const prompt = `
+       Analyze this product image, label, or invoice entry. Extract the following details into a JSON object strictly:
+       - name: Product name (title case, be specific)
+       - brand: Brand name
+       - category: Product category (slug format if possible, e.g. mobile-accessories, groceries)
+       - description: A detailed description based on visual features.
+       - quantity: Quantity number if visible (default 1)
+       - unit: Unit (pcs, kg, ltr, etc. default 'pcs')
+       - sellingPrice: Selling price (number)
+       - costPrice: Cost price (number)
+       - sku: SKU or Barcode (string)
+       - expiryDate: Expiry date in YYYY-MM-DD format
+       - minStock: Suggested low stock alert level (number, e.g. 10)
+       
+       If a field is not found, key should be null or empty string. Return ONLY the JSON.
+     `;
+
+     const result = await model.generateContent([prompt, imagePart]);
+     const text = result.response.text().replace(/```json/g, "").replace(/```/g, "").trim();
+     const data = JSON.parse(text);
+     
+     return { success: true, data, imageUrl };
+  } catch (error) {
+    console.error("Scan failed:", error);
+    throw new Error("Failed to scan product. Please try again.");
+  }
+}
+
+export async function generateProductImage(description: string) {
+  const session = await getSession();
+  if (!session) throw new Error("Unauthorized");
+
+  // 1. Generate Buffer from AI API (Pollinations.ai is free and easy)
+  const encodedPrompt = encodeURIComponent(description + ", realistic product photography, white background, high quality, 4k");
+  const aiImageUrl = `https://pollinations.ai/p/${encodedPrompt}?width=512&height=512&seed=${Math.floor(Math.random() * 1000)}`;
+  
+  const response = await fetch(aiImageUrl);
+  if (!response.ok) throw new Error("Failed to generate image");
+  
+  const arrayBuffer = await response.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+
+  // 2. Upload to Cloudinary
+  const imageUrl = await new Promise<string>((resolve, reject) => {
+    cloudinary.uploader.upload_stream(
+      { folder: "ai_generated_products" },
+      (error, result) => {
+        if (error) reject(error);
+        else resolve(result?.secure_url || "");
+      }
+    ).end(buffer);
+  });
+
+  return imageUrl;
 }

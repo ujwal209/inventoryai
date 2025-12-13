@@ -9,6 +9,7 @@ import DealerInventoryView from "./DealerInventoryView";
 import RaiseInvoiceView from "./RaiseInvoiceView";
 import DealerOrdersView from "./DealerOrdersView";
 
+import NotificationBell from "@/components/common/NotificationBell";
 import { Toaster } from 'sonner';
 import { getDealerRequests } from "@/actions/requests";
 
@@ -100,10 +101,7 @@ export default function DealerDashboard({ user, inventory, vendors }: { user: an
             >
               {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>
-            <button className="relative p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
-            </button>
+            <NotificationBell />
             <div className="flex items-center gap-3 pl-4 border-l border-gray-200 dark:border-slate-800">
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-medium text-slate-900 dark:text-white">{user.name || user.email}</p>

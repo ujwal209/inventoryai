@@ -106,7 +106,7 @@ export default function DealerInventoryView({ inventory }: DealerInventoryViewPr
       setItemForm(prev => ({ ...prev, image: imageUrl }));
     } catch (error) {
       console.error(error);
-      alert("Failed to upload image");
+      toast.error("Failed to upload image");
     } finally {
       setUploadingImage(false);
     }
@@ -224,8 +224,17 @@ export default function DealerInventoryView({ inventory }: DealerInventoryViewPr
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button 
-                        onClick={async () => {
-                          if(confirm("Delete item?")) await deleteInventoryItem(item.docId);
+                        onClick={() => {
+                          toast("Delete this item?", {
+                            action: {
+                              label: "Delete",
+                              onClick: async () => {
+                                await deleteInventoryItem(item.docId);
+                                toast.success("Item deleted");
+                              }
+                            },
+                            cancel: { label: "Cancel" }
+                          });
                         }}
                         className="p-1.5 bg-white/90 rounded-lg text-slate-600 hover:text-red-500 shadow-sm"
                       >
